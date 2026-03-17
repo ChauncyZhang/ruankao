@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>刷题练习</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { text-align: center; color: #333; margin-bottom: 20px; }
+        
+        .stats { display: flex; justify-content: space-around; background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #007AFF; }
+        .stat-label { font-size: 12px; color: #666; }
+        
+        .question-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .question-title { font-size: 18px; font-weight: 600; margin-bottom: 15px; line-height: 1.5; }
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .option { padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .option:hover { border-color: #007AFF; background: #f0f7ff; }
+        .option.selected { border-color: #007AFF; background: #007AFF; color: white; }
+        .option.correct { border-color: #34C759; background: #e8f5e9; }
+        .option.wrong { border-color: #FF3B30; background: #ffecec; }
+        
+        .btn { display: block; width: 100%; padding: 15px; background: #007AFF; color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-bottom: 10px; }
+        .btn:active { opacity: 0.8; }
+        .btn-secondary { background: #34C759; }
+        
+        .tab-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab { flex: 1; padding: 12px; text-align: center; background: white; border-radius: 8px; cursor: pointer; }
+        .tab.active { background: #007AFF; color: white; }
+        
+        .wrong-list { background: white; border-radius: 12px; padding: 15px; }
+        .wrong-item { padding: 12px; border-bottom: 1px solid #eee; }
+        .wrong-item:last-child { border-bottom: none; }
+        .wrong-question { font-weight: 500; margin-bottom: 5px; }
+        .wrong-answer { color: #FF3B30; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 刷题练习</h1>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="total">0</div>
+                <div class="stat-label">总题数</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="done">0</div>
+                <div class="stat-label">已答</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="correct">0</div>
+                <div class="stat-label">正确</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="rate">0%</div>
+                <div class="stat-label">正确率</div>
+            </div>
+        </div>
+        
+        <div class="tab-bar">
+            <div class="tab active" onclick="showTab('practice')">练习</div>
+            <div class="tab" onclick="showTab('wrong')">错题本</div>
+            <div class="tab" onclick="showTab('all')">所有题</div>
+        </div>
+        
+        <div id="practice-view">
+            <div class="question-card">
+                <div class="question-title" id="question"></div>
+                <div class="options" id="options"></div>
+            </div>
+            <button class="btn" onclick="nextQuestion()" id="next-btn">下一题</button>
+            <button class="btn btn-secondary" onclick="shuffleQuestions()">🔀 随机打乱</button>
+        </div>
+        
+        <div id="wrong-view" style="display:none">
+            <div class="wrong-list" id="wrong-list"></div>
+        </div>
+        
+        <div id="all-view" style="display:none">
+            <div class="wrong-list" id="all-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // 题库 - 在这里添加你的题目
+        const questions = [
+            {
+                id: 1,
+                title: "中国的首都是哪里？",
+                options: ["上海", "北京", "广州", "深圳"],
+                answer: 1
+            },
+            {
+                id: 2,
+                title: "1 + 1 = ?",
+                options: ["1", "2", "3", "4"],
+                answer: 1
+            },
+            {
+                id: 3,
+                title: "中国的最高峰是？",
+                options: ["华山", "黄山", "珠穆朗玛峰", "泰山"],
+                answer: 2
+            },
+            {
+                id: 4,
+                title: "飞书的母公司是？",
+                options: ["阿里巴巴", "腾讯", "字节跳动", "百度"],
+                answer: 2
+            },
+            {
+                id: 5,
+                title: "一年有几个月？",
+                options: ["10", "11", "12", "13"],
+                answer: 2
+            }
+        ];
+
+        let currentIndex = 0;
+        let shuffledQuestions = [...questions];
+        let wrongAnswers = [];
+        let doneCount = 0;
+        let correctCount = 0;
+
+        function shuffleQuestions() {
+            shuffledQuestions = [...questions].sort(() => Math.random() - 0.5);
+            currentIndex = 0;
+            doneCount = 0;
+            correctCount = 0;
+            wrongAnswers = [];
+            updateStats();
+            renderQuestion();
+        }
+
+        function updateStats() {
+            document.getElementById('total').textContent = questions.length;
+            document.getElementById('done').textContent = doneCount;
+            document.getElementById('correct').textContent = correctCount;
+            document.getElementById('rate').textContent = doneCount ? Math.round(correctCount / doneCount * 100) + '%' : '0%';
+        }
+
+        function renderQuestion() {
+            const q = shuffledQuestions[currentIndex];
+            document.getElementById('question').textContent = q.title;
+            
+            const optionsEl = document.getElementById('options');
+            optionsEl.innerHTML = '';
+            
+            q.options.forEach((opt, i) => {
+                const div = document.createElement('div');
+                div.className = 'option';
+                div.textContent = opt;
+                div.onclick = () => selectOption(i);
+                optionsEl.appendChild(div);
+            });
+            
+            document.getElementById('next-btn').textContent = '下一题';
+            document.getElementById('next-btn').style.display = 'none';
+        }
+
+        function selectOption(index) {
+            const q = shuffledQuestions[currentIndex];
+            const options = document.querySelectorAll('.option');
+            
+            options.forEach((opt, i) => {
+                opt.style.pointerEvents = 'none';
+                if (i === q.answer) {
+                    opt.classList.add('correct');
+                } else if (i === index && i !== q.answer) {
+                    opt.classList.add('wrong');
+                }
+            });
+            
+            doneCount++;
+            if (index === q.answer) {
+                correctCount++;
+            } else {
+                wrongAnswers.push(q);
+            }
+            
+            updateStats();
+            document.getElementById('next-btn').style.display = 'block';
+        }
+
+        function nextQuestion() {
+            currentIndex = (currentIndex + 1) % shuffledQuestions.length;
+            renderQuestion();
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('practice-view').style.display = tab === 'practice' ? 'block' : 'none';
+            document.getElementById('wrong-view').style.display = tab === 'wrong' ? 'block' : 'none';
+            document.getElementById('all-view').style.display = tab === 'all' ? 'block' : 'none';
+            
+            if (tab === 'wrong') renderWrongList();
+            if (tab === 'all') renderAllList();
+        }
+
+        function renderWrongList() {
+            const list = document.getElementById('wrong-list');
+            if (wrongAnswers.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#666">暂无错题，继续加油！</p>';
+                return;
+            }
+            list.innerHTML = wrongAnswers.map(q => `
+                <div class="wrong-item">
+                    <div class="wrong-question">${q.title}</div>
+                    <div class="wrong-answer">正确答案: ${q.options[q.answer]}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderAllList() {
+            const list = document.getElementById('all-list');
+            list.innerHTML = questions.map(q => `
+                <div class="wrong-item">
+                    <div class="wrong-question">${q.id}. ${q.title}</div>
+                    <div class="wrong-answer">答案: ${q.options[q.answer]}</div>
+                </div>
+            `).join('');
+        }
+
+        // 初始化
+        shuffleQuestions();
+    </script>
+</body>
+</html>
