@@ -94,12 +94,6 @@ export async function listQuestionsFromBitable(): Promise<PracticeQuestion[]> {
     } as PracticeQuestion;
   });
 }
-] || ''),
-        tags: Array.isArray(f['标签']) ? f['标签'] : [],
-        difficulty: Number(f['难度'] || 1),
-      } as PracticeQuestion;
-    });
-}
 
 export async function createAttemptRecord(input: {
   questionId: string;
