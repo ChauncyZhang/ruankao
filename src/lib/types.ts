@@ -10,3 +10,13 @@ export type PracticeQuestion = {
   tags: string[];
   difficulty: number;
 };
+
+export type WrongRecord = {
+  id: string;
+  questionId: string;
+  stem: string;
+  wrongCount: number;
+  lastStatus: string;
+  tags: string[];
+  updatedAt?: string;
+};

@@ -1,4 +1,4 @@
-import { PracticeQuestion } from './types';
+import { PracticeQuestion, WrongRecord } from './types';
 
 const APP_TOKEN = process.env.FEISHU_APP_TOKEN!;
 const TABLE_ID = process.env.FEISHU_TABLE_ID!;
@@ -93,4 +93,171 @@ export async function listQuestionsFromBitable(): Promise<PracticeQuestion[]> {
       difficulty: Number(f['难度'] || 1),
     } as PracticeQuestion;
   });
+}
+] || ''),
+        tags: Array.isArray(f['标签']) ? f['标签'] : [],
+        difficulty: Number(f['难度'] || 1),
+      } as PracticeQuestion;
+    });
+}
+
+export async function createAttemptRecord(input: {
+  questionId: string;
+  stem: string;
+  userAnswerJson: string[];
+  isCorrect: boolean;
+  tags?: string[];
+}) {
+  const token = await getTenantAccessToken();
+  const res = await fetch(
+    `https://open.feishu.cn/open-apis/bitable/v1/apps/${APP_TOKEN}/tables/${TABLE_ID}/records`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fields: {
+          文本: `attempt-${input.questionId}-${Date.now()}`,
+          记录类型: 'attempt',
+          题目ID: input.questionId,
+          题干: input.stem,
+          用户答案JSON: JSON.stringify(input.userAnswerJson),
+          是否正确: input.isCorrect,
+          作答时间: Date.now(),
+          标签: input.tags || [],
+          最后状态: input.isCorrect ? 'correct' : 'wrong',
+        },
+      }),
+    },
+  );
+
+  const data = await res.json();
+  if (!res.ok || data.code !== 0) {
+    throw new Error(data.msg || 'Failed to create attempt record');
+  }
+
+  return data.data?.record;
+}
+
+export async function listWrongRecords(): Promise<WrongRecord[]> {
+  const token = await getTenantAccessToken();
+  const res = await fetch(
+    `https://open.feishu.cn/open-apis/bitable/v1/apps/${APP_TOKEN}/tables/${TABLE_ID}/records?page_size=200`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    },
+  );
+  const data = await res.json();
+  if (!res.ok || data.code !== 0) {
+    throw new Error(data.msg || 'Failed to fetch wrong records');
+  }
+
+  return (data.data?.items || [])
+    .filter((item: any) => (item.fields || {})['记录类型'] === 'wrong')
+    .map((item: any) => {
+      const f = item.fields || {};
+      return {
+        id: item.record_id,
+        questionId: String(f['题目ID'] || ''),
+        stem: String(f['题干'] || ''),
+        wrongCount: Number(f['错题次数'] || 1),
+        lastStatus: String(f['最后状态'] || 'wrong'),
+        tags: Array.isArray(f['标签']) ? f['标签'] : [],
+        updatedAt: f['作答时间'] ? String(f['作答时间']) : undefined,
+      } as WrongRecord;
+    });
+}
+
+export async function upsertWrongRecord(input: {
+  questionId: string;
+  stem: string;
+  tags?: string[];
+  isCorrect: boolean;
+}) {
+  const token = await getTenantAccessToken();
+  const existing = await listWrongRecords();
+  const matched = existing.find((item) => item.questionId === input.questionId);
+
+  if (input.isCorrect) {
+    if (!matched) return null;
+    const res = await fetch(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${APP_TOKEN}/tables/${TABLE_ID}/records/${matched.id}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fields: {
+            最后状态: 'correct',
+            作答时间: Date.now(),
+          },
+        }),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok || data.code !== 0) {
+      throw new Error(data.msg || 'Failed to update wrong record');
+    }
+    return data.data?.record;
+  }
+
+  if (matched) {
+    const res = await fetch(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${APP_TOKEN}/tables/${TABLE_ID}/records/${matched.id}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fields: {
+            错题次数: matched.wrongCount + 1,
+            最后状态: 'wrong',
+            作答时间: Date.now(),
+          },
+        }),
+      },
+    );
+    const data = await res.json();
+    if (!res.ok || data.code !== 0) {
+      throw new Error(data.msg || 'Failed to update wrong record');
+    }
+    return data.data?.record;
+  }
+
+  const res = await fetch(
+    `https://open.feishu.cn/open-apis/bitable/v1/apps/${APP_TOKEN}/tables/${TABLE_ID}/records`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fields: {
+          文本: `wrong-${input.questionId}`,
+          记录类型: 'wrong',
+          题目ID: input.questionId,
+          题干: input.stem,
+          标签: input.tags || [],
+          错题次数: 1,
+          最后状态: 'wrong',
+          作答时间: Date.now(),
+        },
+      }),
+    },
+  );
+  const data = await res.json();
+  if (!res.ok || data.code !== 0) {
+    throw new Error(data.msg || 'Failed to create wrong record');
+  }
+  return data.data?.record;
 }
