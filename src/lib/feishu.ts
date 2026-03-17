@@ -1,4 +1,4 @@
-import { PracticeQuestion, WrongRecord } from './types';
+import { AttemptRecord, PracticeQuestion, WrongRecord } from './types';
 
 const APP_TOKEN = process.env.FEISHU_APP_TOKEN!;
 const TABLE_ID = process.env.FEISHU_TABLE_ID!;
@@ -138,6 +138,37 @@ export async function createAttemptRecord(input: {
   }
 
   return data.data?.record;
+}
+
+export async function listAttemptRecords(): Promise<AttemptRecord[]> {
+  const token = await getTenantAccessToken();
+  const res = await fetch(
+    `https://open.feishu.cn/open-apis/bitable/v1/apps/${APP_TOKEN}/tables/${TABLE_ID}/records?page_size=200`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: 'no-store',
+    },
+  );
+  const data = await res.json();
+  if (!res.ok || data.code !== 0) {
+    throw new Error(data.msg || 'Failed to fetch attempt records');
+  }
+
+  return (data.data?.items || [])
+    .filter((item: any) => (item.fields || {})['记录类型'] === 'attempt')
+    .map((item: any) => {
+      const f = item.fields || {};
+      return {
+        id: item.record_id,
+        questionId: String(f['题目ID'] || ''),
+        stem: String(f['题干'] || ''),
+        isCorrect: Boolean(f['是否正确']),
+        tags: Array.isArray(f['标签']) ? f['标签'] : [],
+        answeredAt: f['作答时间'] ? String(f['作答时间']) : undefined,
+      } as AttemptRecord;
+    });
 }
 
 export async function listWrongRecords(): Promise<WrongRecord[]> {

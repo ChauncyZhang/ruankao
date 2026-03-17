@@ -20,3 +20,12 @@ export type WrongRecord = {
   tags: string[];
   updatedAt?: string;
 };
+
+export type AttemptRecord = {
+  id: string;
+  questionId: string;
+  stem: string;
+  isCorrect: boolean;
+  tags: string[];
+  answeredAt?: string;
+};
