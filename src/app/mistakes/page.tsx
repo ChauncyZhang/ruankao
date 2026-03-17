@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { SiteHeader } from '@/components/SiteHeader';
 import { WrongRecord } from '@/lib/types';
@@ -16,12 +16,19 @@ export default function MistakesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const reviewQuery = useMemo(() => items.map((item) => item.questionId).join(','), [items]);
+
   return (
     <main className="container">
       <SiteHeader />
       <div className="card">
-        <h2>错题本</h2>
-        <p className="subtitle">点击题目可进入重做。</p>
+        <div className="actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0 }}>错题本</h2>
+            <p className="subtitle" style={{ marginTop: 8 }}>点击题目可进入重做。</p>
+          </div>
+          {!!items.length ? <Link href={`/practice?review=${reviewQuery}`} className="btn">开始错题重刷</Link> : null}
+        </div>
         {loading ? <p className="muted">加载中...</p> : null}
         {!loading && !items.length ? <p className="muted">当前还没有错题。</p> : null}
         {!!items.length ? (
