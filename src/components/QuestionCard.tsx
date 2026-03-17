@@ -1,7 +1,7 @@
 import { formatQuestionType } from '@/lib/helpers';
 import { PracticeQuestion } from '@/lib/types';
 
-export function QuestionCard({ question, selected, onChange, showResult }: { question: PracticeQuestion; selected: string[]; onChange: (v: string[]) => void; showResult?: boolean }) {
+export function QuestionCard({ question, selected, onChange, showResult, locked = false }: { question: PracticeQuestion; selected: string[]; onChange: (v: string[]) => void; showResult?: boolean; locked?: boolean }) {
   const isMultiple = question.type === 'multiple_choice';
 
   return (
@@ -15,12 +15,14 @@ export function QuestionCard({ question, selected, onChange, showResult }: { que
         {question.optionsJson.map((option) => {
           const checked = selected.includes(option.key);
           return (
-            <label key={option.key} className="option">
+            <label key={option.key} className="option" style={{ opacity: locked ? 0.85 : 1, cursor: locked ? 'default' : 'pointer' }}>
               <input
                 type={isMultiple ? 'checkbox' : 'radio'}
                 checked={checked}
+                disabled={locked}
                 name={`question-${question.id}`}
                 onChange={() => {
+                  if (locked) return;
                   if (isMultiple) {
                     onChange(checked ? selected.filter((item) => item !== option.key) : [...selected, option.key]);
                   } else {
