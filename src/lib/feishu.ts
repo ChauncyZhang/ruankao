@@ -80,19 +80,24 @@ export async function listQuestionsFromBitable(): Promise<PracticeQuestion[]> {
     throw new Error(data.msg || 'Failed to fetch bitable records');
   }
 
-  return (data.data?.items || []).map((item: any) => {
-    const f = item.fields || {};
-    return {
-      id: String(f['题目ID'] || item.record_id),
-      type: String(f['题型'] || 'single_choice'),
-      stem: String(f['题干'] || ''),
-      optionsJson: JSON.parse(String(f['选项JSON'] || '[]')),
-      answerJson: JSON.parse(String(f['答案JSON'] || '[]')),
-      analysis: String(f['解析'] || ''),
-      tags: Array.isArray(f['标签']) ? f['标签'] : [],
-      difficulty: Number(f['难度'] || 1),
-    } as PracticeQuestion;
-  });
+  return (data.data?.items || [])
+    .filter((item: any) => {
+      const f = item.fields || {};
+      return f['记录类型'] === 'question';
+    })
+    .map((item: any) => {
+      const f = item.fields || {};
+      return {
+        id: String(f['题目ID'] || item.record_id),
+        type: String(f['题型'] || 'single_choice'),
+        stem: String(f['题干'] || ''),
+        optionsJson: JSON.parse(String(f['选项JSON'] || '[]')),
+        answerJson: JSON.parse(String(f['答案JSON'] || '[]')),
+        analysis: String(f['解析'] || ''),
+        tags: Array.isArray(f['标签']) ? f['标签'] : [],
+        difficulty: Number(f['难度'] || 1),
+      } as PracticeQuestion;
+    });
 }
 
 export async function createAttemptRecord(input: {

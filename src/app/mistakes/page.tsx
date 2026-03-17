@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { SiteHeader } from '@/components/SiteHeader';
 import { WrongRecord } from '@/lib/types';
 
@@ -20,7 +21,7 @@ export default function MistakesPage() {
       <SiteHeader />
       <div className="card">
         <h2>错题本</h2>
-        <p className="subtitle">当前已接真实错题记录。</p>
+        <p className="subtitle">点击题目可进入重做。</p>
         {loading ? <p className="muted">加载中...</p> : null}
         {!loading && !items.length ? <p className="muted">当前还没有错题。</p> : null}
         {!!items.length ? (
@@ -38,7 +39,7 @@ export default function MistakesPage() {
               {items.map((item) => (
                 <tr key={item.id}>
                   <td>{item.questionId}</td>
-                  <td>{item.stem}</td>
+                  <td><Link href={`/mistakes/${item.questionId}`} style={{ color: '#2563eb' }}>{item.stem}</Link></td>
                   <td>{item.tags.join(', ')}</td>
                   <td>{item.wrongCount}</td>
                   <td>{item.lastStatus}</td>
