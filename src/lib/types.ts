@@ -1,8 +1,15 @@
 export type OptionItem = { key: string; text: string };
 
+export type PracticeQuestionType =
+  | 'single_choice'
+  | 'multiple_choice'
+  | 'judge'
+  | 'short_answer'
+  | 'case_analysis';
+
 export type PracticeQuestion = {
   id: string;
-  type: string;
+  type: PracticeQuestionType;
   stem: string;
   optionsJson: OptionItem[];
   answerJson: string[];
