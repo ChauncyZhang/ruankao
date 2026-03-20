@@ -16,13 +16,35 @@ function shuffleArray<T>(items: T[]) {
   return copied;
 }
 
+type Mode = 'sequence' | 'random' | 'exam';
+
+type TagGroup = {
+  key: string;
+  title: string;
+  tags: string[];
+};
+
+function getTagGroup(tag: string) {
+  if (tag.startsWith('章节:')) return 'chapter';
+  if (tag.startsWith('主题:')) return 'topic';
+  if (tag.startsWith('能力:')) return 'ability';
+  return 'other';
+}
+
+function getModeLabel(mode: Mode, reviewIds: string | null) {
+  if (reviewIds) return '错题重刷';
+  if (mode === 'sequence') return '顺序刷题';
+  if (mode === 'random') return '随机刷题';
+  return '模拟考试';
+}
+
 export default function PracticeClient() {
   const searchParams = useSearchParams();
   const reviewIds = searchParams.get('review');
 
   const [allQuestions, setAllQuestions] = useState<PracticeQuestion[]>([]);
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
-  const [mode, setMode] = useState<'sequence' | 'random' | 'exam'>('sequence');
+  const [mode, setMode] = useState<Mode>('sequence');
   const [activeTag, setActiveTag] = useState<string>('all');
   const [examCount, setExamCount] = useState<number>(10);
   const [index, setIndex] = useState(0);
@@ -35,6 +57,26 @@ export default function PracticeClient() {
   const allTags = useMemo(() => {
     return Array.from(new Set(allQuestions.flatMap((item) => item.tags || [])));
   }, [allQuestions]);
+
+  const tagGroups = useMemo<TagGroup[]>(() => {
+    const buckets: Record<string, string[]> = {
+      chapter: [],
+      topic: [],
+      ability: [],
+      other: [],
+    };
+
+    allTags.forEach((tag) => {
+      buckets[getTagGroup(tag)].push(tag);
+    });
+
+    return [
+      { key: 'chapter', title: '按章节筛选', tags: buckets.chapter },
+      { key: 'topic', title: '按主题筛选', tags: buckets.topic },
+      { key: 'ability', title: '按能力筛选', tags: buckets.ability },
+      { key: 'other', title: '其他标签', tags: buckets.other },
+    ].filter((group) => group.tags.length > 0);
+  }, [allTags]);
 
   const stats = useMemo(() => {
     const values = Object.values(resultMap);
@@ -50,7 +92,7 @@ export default function PracticeClient() {
 
   const rebuildQuestions = (
     baseItems: PracticeQuestion[],
-    nextMode: 'sequence' | 'random' | 'exam',
+    nextMode: Mode,
     tag: string,
     nextExamCount: number,
   ) => {
@@ -81,8 +123,10 @@ export default function PracticeClient() {
 
   const question = useMemo(() => questions[index], [questions, index]);
   const correct = submitted && question ? isAnswerCorrect(selected, question.answerJson) : null;
+  const modeLabel = getModeLabel(mode, reviewIds);
+  const selectedTagLabel = activeTag === 'all' ? '全部内容' : activeTag;
 
-  const applyFilters = (nextMode: 'sequence' | 'random' | 'exam', nextTag: string, nextExamCount = examCount) => {
+  const applyFilters = (nextMode: Mode, nextTag: string, nextExamCount = examCount) => {
     const nextQuestions = rebuildQuestions(allQuestions, nextMode, nextTag, nextExamCount);
     setMode(nextMode);
     setActiveTag(nextTag);
@@ -93,6 +137,10 @@ export default function PracticeClient() {
     setSubmitted(false);
     setFinished(false);
     setResultMap({});
+  };
+
+  const scrollToCurrentQuestion = () => {
+    document.getElementById('current-question')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const submitAnswer = async () => {
@@ -124,28 +172,95 @@ export default function PracticeClient() {
   return (
     <>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><strong>刷题模式</strong></div>
+        <div className="practice-header-row">
+          <div>
+            <div><strong>刷题模式</strong></div>
+            <div className="subtitle" style={{ marginTop: 8 }}>
+              先选模式，再按章节 / 主题 / 能力缩小范围，然后直接开始刷题。
+            </div>
+          </div>
           <div className="segmented">
-            <button className={`btn secondary ${mode === 'sequence' ? 'active' : ''}`} onClick={() => applyFilters('sequence', activeTag)}>顺序刷题</button>
-            <button className={`btn secondary ${mode === 'random' ? 'active' : ''}`} onClick={() => applyFilters('random', activeTag)}>随机刷题</button>
-            <button className={`btn secondary ${mode === 'exam' ? 'active' : ''}`} onClick={() => applyFilters('exam', activeTag, examCount)}>模拟考试</button>
+            <button className={`btn secondary ${mode === 'sequence' ? 'active' : ''}`} onClick={() => applyFilters('sequence', activeTag)}>
+              顺序刷题
+            </button>
+            <button className={`btn secondary ${mode === 'random' ? 'active' : ''}`} onClick={() => applyFilters('random', activeTag)}>
+              随机刷题
+            </button>
+            <button className={`btn secondary ${mode === 'exam' ? 'active' : ''}`} onClick={() => applyFilters('exam', activeTag, examCount)}>
+              模拟考试
+            </button>
           </div>
         </div>
+
         {reviewIds ? <div className="muted" style={{ marginTop: 12 }}>当前模式：错题重刷</div> : null}
+
         {mode === 'exam' ? (
           <div className="actions" style={{ marginTop: 12, alignItems: 'center' }}>
             <span className="muted">题量：</span>
             {[5, 10, 20].map((count) => (
-              <button key={count} className={`btn secondary ${examCount === count ? 'active' : ''}`} onClick={() => applyFilters('exam', activeTag, count)}>{count} 题</button>
+              <button
+                key={count}
+                className={`btn secondary ${examCount === count ? 'active' : ''}`}
+                onClick={() => applyFilters('exam', activeTag, count)}
+              >
+                {count} 题
+              </button>
             ))}
           </div>
         ) : null}
-        {!!allTags.length ? (
-          <div className="segmented" style={{ marginTop: 12 }}>
-            <button className={`btn secondary ${activeTag === 'all' ? 'active' : ''}`} onClick={() => applyFilters(mode, 'all', examCount)}>全部内容</button>
-            {allTags.map((tag) => (
-              <button key={tag} className={`btn secondary ${activeTag === tag ? 'active' : ''}`} onClick={() => applyFilters(mode, tag, examCount)}>{tag}</button>
+
+        <div className="practice-summary">
+          <div className="practice-summary-grid">
+            <div>
+              <div className="muted">当前模式</div>
+              <div className="practice-summary-value">{modeLabel}</div>
+            </div>
+            <div>
+              <div className="muted">当前筛选</div>
+              <div className="practice-summary-value">{selectedTagLabel}</div>
+            </div>
+            <div>
+              <div className="muted">匹配题数</div>
+              <div className="practice-summary-value">{loading ? '--' : `${questions.length} 题`}</div>
+            </div>
+          </div>
+          <div className="actions">
+            <button className="btn" onClick={scrollToCurrentQuestion} disabled={loading || !questions.length}>
+              {mode === 'exam' ? '开始模拟考试' : '开始刷题'}
+            </button>
+            {activeTag !== 'all' ? (
+              <button className="btn secondary" onClick={() => applyFilters(mode, 'all', examCount)}>
+                清空筛选
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {!!tagGroups.length ? (
+          <div className="practice-filter-groups">
+            <div className="filter-group">
+              <div className="filter-group-title">快捷筛选</div>
+              <div className="segmented">
+                <button className={`btn secondary ${activeTag === 'all' ? 'active' : ''}`} onClick={() => applyFilters(mode, 'all', examCount)}>
+                  全部内容
+                </button>
+              </div>
+            </div>
+            {tagGroups.map((group) => (
+              <div key={group.key} className="filter-group">
+                <div className="filter-group-title">{group.title}</div>
+                <div className="segmented">
+                  {group.tags.map((tag) => (
+                    <button
+                      key={tag}
+                      className={`btn secondary ${activeTag === tag ? 'active' : ''}`}
+                      onClick={() => applyFilters(mode, tag, examCount)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         ) : null}
@@ -160,7 +275,7 @@ export default function PracticeClient() {
       ) : null}
 
       {loading ? <div className="card">加载中...</div> : null}
-      {!loading && !questions.length ? <div className="card">当前筛选条件下暂无题目。</div> : null}
+      {!loading && !questions.length ? <div className="card">当前筛选条件下暂无题目，请切换模式或清空筛选后重试。</div> : null}
 
       {!loading && finished ? (
         <div className="card center-empty">
@@ -176,10 +291,10 @@ export default function PracticeClient() {
 
       {question && !finished ? (
         <>
-          <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card" id="current-question" style={{ marginBottom: 16 }}>
             <div className="actions" style={{ justifyContent: 'space-between' }}>
               <div><strong>当前进度：</strong>第 {index + 1} / {questions.length} 题</div>
-              <div className="muted">模式：{reviewIds ? '错题重刷' : mode === 'sequence' ? '顺序刷题' : mode === 'random' ? '随机刷题' : '模拟考试'}</div>
+              <div className="muted">模式：{modeLabel}</div>
             </div>
           </div>
           <QuestionCard question={question} selected={selected} onChange={setSelected} showResult={submitted} locked={submitted} />
